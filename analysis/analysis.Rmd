@@ -1,0 +1,1363 @@
+---
+title: "IST"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(brms)
+library(cowplot)
+library(readxl)
+library(ggthemes)
+library(lme4)
+```
+
+
+```{r}
+data <- read_csv("../data/asha_data_all.csv")
+
+```
+
+# Descriptives
+
+```{r}
+n_distinct(data$testlanguage)
+
+n_distinct(data$child)
+```
+
+
+```{r}
+data%>%
+  group_by(ling)%>%
+  summarise(n = n_distinct(child),
+            mean_age = mean(age),
+            sd = sd(age), 
+            range_min = range(age)[1],
+            range_max = range(age)[2])%>%
+  write_csv(., "../data/desc_age.csv")
+```
+
+```{r}
+data%>%
+  filter(item == "setting")%>%
+  group_by(ling, test_lang_status, mode)%>%
+  summarise(narratives = n(), 
+            narr_ist = sum(response))%>%
+  write_csv(., "../data/desc_narratives.csv")
+```
+
+```{r}
+data%>%
+  filter(item == "setting")%>%
+  group_by(ling, test_lang_status, mode, story)%>%
+  summarise(n = n())%>%
+  write_csv(., "../data/desc_narratives_story.csv")
+```
+
+```{r}
+data%>%
+  distinct(child, .keep_all = T)%>%
+  group_by(dataorigin)%>%
+  summarise(N_participants = n_distinct(child), 
+            mean_age = round(mean(age)/12,2), 
+            min_age = round(min(age)/12,2),
+            max_age = round(max(age)/12,2),
+            N_bilinguals = sum(ling == "Bilingual")
+            )%>%
+  write_csv(., "../data/asha_demographics_by_origin.csv")
+```
+
+
+## 1 Development
+
+```{r}
+devdata <- data%>%
+  filter(item == "ist",
+         type == "td")%>%
+  group_by(child, age, testlanguage)%>%
+  summarise(sum = sum(response),
+            n = length(response))
+
+
+mdevdata <- devdata%>%
+  ungroup()%>%
+  mutate(age = scale(age))
+
+```
+
+```{r}
+# bm0 <- brm(sum|trials(n) ~ age + (1|child) + (age | testlanguage), 
+#     data = mdevdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm0, "../saves/bm0.rds")
+```
+
+
+ Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ age + (1 | child) + (age | testlanguage) 
+   Data: mdevdata (Number of observations: 3563) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 2722) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.56      0.02     0.51     0.60 1.00     2863     5061
+
+~testlanguage (Number of levels: 44) 
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)          0.61      0.08     0.47     0.78 1.00     1454     2848
+sd(age)                0.52      0.10     0.36     0.74 1.00     1554     2763
+cor(Intercept,age)     0.07      0.19    -0.30     0.43 1.00     1476     2740
+
+Regression Coefficients:
+          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept    -0.71      0.11    -0.92    -0.51 1.01      722     1449
+age           0.71      0.10     0.52     0.91 1.01     1126     2108
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+```{r}
+# ndata0 <- mdevdata%>%
+#   select(testlanguage, age)%>%
+#   group_by(testlanguage)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post0 <- fitted(bm0, newdata = ndata0, re_formula =~(age | testlanguage))%>%
+#   as_tibble() %>%
+#   bind_cols(ndata0)%>%
+#   mutate(age = age * sd(devdata$age, na.rm = T) + mean(devdata$age, na.rm = T))
+# 
+# saveRDS(post0, "../saves/post0.rds")
+
+post0 <- readRDS("../saves/post0.rds")
+
+# ndata0_2 <- mdevdata%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post0_2 <- fitted(bm0, newdata = ndata0_2, re_formula = NA)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata0_2)%>%
+#   mutate(age = age * sd(devdata$age, na.rm = T) + mean(devdata$age, na.rm = T))
+# 
+# saveRDS(post0_2, "../saves/post0_2.rds")
+
+post0_2 <- readRDS("../saves/post0_2.rds")
+
+ggplot()+
+  geom_line(data = post0, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, group = testlanguage), stat = "identity", alpha = .25)+
+  geom_smooth(data = post0_2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5), stat = "identity", alpha = .25, col = "black")+
+  theme_bw()+
+  ylim(0,1)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+```{r}
+ggsave("../visuals/rq0_overview.png", width = 6, height = 4)
+```
+
+
+## 2 IST development by age, separate for mono and bilinguals and telling und re-telling, model comparison for mono and bilinguals
+
+
+```{r}
+istdata <- data%>%
+  filter(item == "ist",
+         type == "td")%>%
+  group_by(child, age, mode, testlanguage, test_lang_status, ling)%>%
+  summarise(sum = sum(response),
+            n = length(response))
+
+
+mistdata <- istdata%>%
+  ungroup()%>%
+  mutate(age = scale(age))
+```
+
+
+```{r}
+
+# bm1_0 <- brm(sum|trials(n) ~ age * ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm1_0, "../saves/bm1_0.rds")
+# 
+# bm1_1 <- brm(sum|trials(n) ~ age + ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm1_1, "../saves/bm1_1.rds")
+# 
+# bm1_2 <- brm(sum|trials(n) ~ age + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm1_2, "../saves/bm1_2.rds")
+
+```
+
+```{r}
+#loo_compare(bm1_0, bm1_1, bm1_2)%>%as_tibble(rownames = "model")
+```
+
+Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ age + ling + mode + test_lang_status + (1 | child) + (age | testlanguage) 
+   Data: mistdata (Number of observations: 4969) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 2722) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.58      0.02     0.53     0.62 1.00     2926     4254
+
+~testlanguage (Number of levels: 44) 
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)          0.57      0.08     0.42     0.75 1.00     1970     3661
+sd(age)                0.60      0.11     0.42     0.83 1.00     1572     3126
+cor(Intercept,age)     0.17      0.18    -0.20     0.52 1.00     1195     2031
+
+Regression Coefficients:
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept              0.10      0.11    -0.12     0.31 1.00     1569     2740
+age                    0.68      0.11     0.47     0.90 1.00     1625     2831
+lingMonolingual       -0.09      0.07    -0.23     0.04 1.00     3770     4572
+modetelling           -1.11      0.03    -1.17    -1.05 1.00     9178     6372
+test_lang_statusL2    -0.01      0.08    -0.16     0.14 1.00     3932     4808
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+
+```{r}
+# ndata1 <- mistdata%>%
+#   group_by(testlanguage,ling, test_lang_status)%>%
+#   select(testlanguage,ling, age, mode, test_lang_status)%>%
+#   group_by(testlanguage,test_lang_status,ling, mode)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post1 <- fitted(bm1_1, newdata = ndata1, re_formula =~(age | testlanguage))%>%
+#   as_tibble() %>%
+#   bind_cols(ndata1)%>%
+#   mutate(age = age * sd(istdata$age, na.rm = T) + mean(istdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post1, "../saves/post1.rds")
+
+post1 <- readRDS("../saves/post1.rds")
+
+# ndata1_2 <- mistdata%>%
+#   select(ling, age, mode, test_lang_status)%>%
+#   group_by(ling, mode, test_lang_status)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post1_2 <- fitted(bm1_1, newdata = ndata1_2, re_formula = NA)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata1_2)%>%
+#   mutate(age = age * sd(istdata$age, na.rm = T) + mean(istdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post1_2, "../saves/post1_2.rds")
+
+post1_2 <- readRDS("../saves/post1_2.rds")
+
+p2_1 <- ggplot()+
+  geom_line(data = post1, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, group = interaction(ling,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post1_2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, fill = ling, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_ptol(name = "Group")+
+  scale_fill_ptol(name = "Group")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  xlim(2.5, 14)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+```{r}
+ggsave("../visuals/rq1_overview.pdf", width = 12, height = 6)
+```
+
+
+### 2.1 Languages with mono and bilinguals
+
+```{r}
+data_ling <- read_csv("../data/asha_data_multi_ling.csv")
+```
+
+```{r}
+alistdata <- data_ling%>%
+  filter(item == "ist",
+         type == "td")%>%
+  group_by(child, age, mode, testlanguage, test_lang_status, ling)%>%
+  summarise(sum = sum(response),
+            n = length(response))
+
+
+malistdata <- alistdata%>%
+  ungroup()%>%
+  mutate(age = scale(age))
+```
+
+
+```{r}
+
+# bm1_0_1 <- brm(sum|trials(n) ~ age * ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = malistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm1_0_1, "../saves/bm1_0_1.rds")
+# 
+# bm1_1_1 <- brm(sum|trials(n) ~ age + ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = malistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm1_1_1, "../saves/bm1_1_1.rds")
+# 
+# 
+# bm1_1_2 <- brm(sum|trials(n) ~ age + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = malistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm1_1_2, "../saves/bm1_1_2.rds")
+
+
+```
+
+```{r}
+#loo_compare(bm1_0_1,bm1_1_1, bm1_1_2 )
+```
+
+Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ age * ling + mode + test_lang_status + (1 | child) + (age | testlanguage) 
+   Data: malistdata (Number of observations: 1403) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 945) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.57      0.05     0.48     0.66 1.00     2618     5119
+
+~testlanguage (Number of levels: 13) 
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)          0.35      0.11     0.20     0.62 1.00     3198     4684
+sd(age)                0.21      0.10     0.05     0.44 1.00     2731     2034
+cor(Intercept,age)     0.35      0.35    -0.43     0.87 1.00     5128     5651
+
+Regression Coefficients:
+                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept              -0.56      0.15    -0.87    -0.26 1.00     4226     5414
+age                     0.56      0.09     0.37     0.74 1.00     4715     5385
+lingMonolingual         0.09      0.10    -0.12     0.29 1.00     6552     5620
+modetelling            -0.78      0.09    -0.96    -0.61 1.00    10095     5941
+test_lang_statusL2     -0.09      0.11    -0.31     0.12 1.00     6537     5192
+age:lingMonolingual    -0.39      0.08    -0.55    -0.23 1.00     6425     6055
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+
+```{r}
+# ndata1_0 <- malistdata%>%
+#   group_by(testlanguage,ling, test_lang_status)%>%
+#   select(testlanguage,ling, age, mode, test_lang_status)%>%
+#   group_by(testlanguage,test_lang_status,ling, mode)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post1_0 <- fitted(bm1_0_1, newdata = ndata1_0, re_formula =~(age | testlanguage))%>%
+#   as_tibble() %>%
+#   bind_cols(ndata1_0)%>%
+#   mutate(age = age * sd(alistdata$age, na.rm = T) + mean(alistdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post1_0, "../saves/post1_0.rds")
+
+post1_0 <- readRDS("../saves/post1_0.rds")
+
+# ndata1_2_0 <- malistdata%>%
+#   select(ling, age, mode, test_lang_status)%>%
+#   group_by(ling, mode, test_lang_status)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post1_2_0 <- fitted(bm1_0_1, newdata = ndata1_2_0, re_formula = NA)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata1_2_0)%>%
+#   mutate(age = age * sd(alistdata$age, na.rm = T) + mean(alistdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post1_2_0, "../saves/post1_2_0.rds")
+
+post1_2_0 <- readRDS("../saves/post1_2_0.rds")
+
+p2_2 <- ggplot()+
+  geom_line(data = post1_0, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, group = interaction(ling,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post1_2_0, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, fill = ling, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_ptol(name = "Group")+
+  scale_fill_ptol(name = "Group")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  xlim(2.5, 14)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+
+```{r}
+legend <- get_legend(
+  # create some space to the left of the legend
+  p2_2 + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+plot_grid(
+  plot_grid(p2_1+ theme(legend.position="none"),
+          p2_2+ theme(legend.position="none"),
+          nrow = 2, labels = c("A", "B")),legend, nrow = 1, rel_widths = c(1, .2))
+```
+
+```{r}
+ggsave("../visuals/rq2_overview.png", width = 12, height = 8)
+```
+
+## 3 Initiating events vs reactions
+
+```{r}
+data_ist_comp <- read_csv("../data/asha_data_ist_comp.csv")
+```
+
+```{r}
+istcompdata <- data_ist_comp%>%
+  filter(type == "td")%>%
+  group_by(child, age, mode, testlanguage, test_lang_status, ling, item)%>%
+  summarise(sum = sum(response),
+            n = length(response))
+```
+
+
+```{r}
+mistcompdata <- istcompdata%>%
+  ungroup()%>%
+  mutate(age = scale(age))
+```
+
+
+```{r}
+# bm3_0 <- brm(sum|trials(n) ~ item * age +  ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mistcompdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm3_0, "../saves/bm3_0.rds")
+# 
+# bm3_0_0 <- brm(sum|trials(n) ~ item * age + ling + mode + test_lang_status + (1|child) + (age + item | testlanguage), 
+#     data = mistcompdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm3_0_0, "../saves/bm3_0_0.rds")
+# 
+# 
+# bm3_0_1 <- brm(sum|trials(n) ~ item + age + ling + mode + test_lang_status + (1|child) + (age + item | testlanguage), 
+#     data = mistcompdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm3_0_0, "../saves/bm3_0_0.rds")
+# 
+# 
+# bm3_1 <- brm(sum|trials(n) ~ item + age  + ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mistcompdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm3_1, "../saves/bm3_1.rds")
+
+```
+
+
+```{r}
+#loo_compare(bm3_0, bm3_0_0, bm3_1, bm3_0_1)%>%as_tibble(rownames = "model")
+```
+
+Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ item * age + ling + mode + test_lang_status + (1 | child) + (age + item | testlanguage) 
+   Data: mistcompdata (Number of observations: 9938) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 2722) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.66      0.02     0.62     0.71 1.00     3269     4781
+
+~testlanguage (Number of levels: 44) 
+                            Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                   0.77      0.11     0.58     1.02 1.00     2127     3755
+sd(age)                         0.68      0.12     0.48     0.94 1.00     2337     4194
+sd(itemreaction)                0.99      0.12     0.77     1.26 1.00     2885     4625
+cor(Intercept,age)              0.07      0.18    -0.27     0.41 1.00     2437     3468
+cor(Intercept,itemreaction)    -0.50      0.17    -0.77    -0.13 1.01      791     1937
+cor(age,itemreaction)           0.24      0.21    -0.20     0.60 1.00      940     1885
+
+Regression Coefficients:
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept              0.70      0.14     0.42     0.98 1.00     1950     3142
+itemreaction          -1.22      0.16    -1.54    -0.91 1.00     2048     3007
+age                    0.90      0.13     0.66     1.15 1.00     2187     3650
+lingMonolingual       -0.10      0.07    -0.24     0.04 1.00     5845     5990
+modetelling           -1.22      0.03    -1.28    -1.15 1.00    12655     5793
+test_lang_statusL2    -0.00      0.08    -0.16     0.16 1.00     5362     5975
+itemreaction:age      -0.34      0.04    -0.42    -0.25 1.00    10335     6220
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+
+```{r}
+# ndata3 <- mistcompdata%>%
+#   select(testlanguage,ling, age, mode, test_lang_status, item)%>%
+#   group_by(testlanguage,test_lang_status,ling, mode, item)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post3 <- fitted(bm3_0_0, newdata = ndata3, re_formula =~(age + item | testlanguage))%>%
+#   as_tibble() %>%
+#   bind_cols(ndata3)%>%
+#   mutate(age = age * sd(istcompdata$age, na.rm = T) + mean(istcompdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post3, "../saves/post3.rds")
+
+post3 <- readRDS("../saves/post3.rds")
+
+
+# ndata3_2 <- mistcompdata%>%
+#   select(ling, age, mode, test_lang_status, item)%>%
+#   group_by(ling, mode, test_lang_status, item)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post3_2 <- fitted(bm3_0_0, newdata = ndata3_2, re_formula = NA)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata3_2)%>%
+#   mutate(age = age * sd(istcompdata$age, na.rm = T) + mean(istcompdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# 
+# saveRDS(post3_2, "../saves/post3_2.rds")
+
+post3_2 <- readRDS("../saves/post3_2.rds")
+
+ggplot()+
+  geom_line(data = post3, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = item, group = interaction(item,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post3_2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =item, col = item, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Internal state", labels = c("Initiating event", "Reaction"))+
+  scale_fill_colorblind(name = "Internal state", labels = c("Initiating event", "Reaction"))+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(ling~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+```{r}
+ggsave("../visuals/rq3_overview.pdf", width = 10, height = 7)
+#ggsave("../visuals/rq3_overview.png", width = 10, height = 7)
+```
+
+## 4 IST by story 
+
+```{r}
+stor_data <- data%>%
+  filter(item == "ist",
+         type == "td")%>%
+  group_by(child, age, mode, testlanguage, test_lang_status, ling, story)%>%
+  summarise(sum = sum(response),
+            n = length(response))%>%
+  mutate(story = factor(story, levels = c("cat", "dog", "bird", "goat"), labels = c("Cat", "Dog", "Baby birds", "Baby goats")))
+
+
+mstor_data <- stor_data%>%
+  ungroup()%>%
+  mutate(age = scale(age))
+```
+
+
+```{r}
+
+# bm6_0 <- brm(sum|trials(n) ~ story * age + ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mstor_data,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm6_0, "../saves/bm6_0.rds")
+# 
+# bm6_0_0 <- brm(sum|trials(n) ~ story * age + ling + mode + test_lang_status + (1|child) + (story + age | testlanguage), 
+#     data = mstor_data,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm6_0_0, "../saves/bm6_0_0.rds")
+# 
+# bm6_0_1 <- brm(sum|trials(n) ~ story + age + ling + mode + test_lang_status + (1|child) + (story + age | testlanguage), 
+#     data = mstor_data,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm6_0_1, "../saves/bm6_0_1.rds")
+# 
+# bm6_1 <- brm(sum|trials(n) ~ story + age + ling + mode + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mstor_data,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm6_1, "../saves/bm6_1.rds")
+
+```
+
+
+
+```{r}
+#loo_compare(bm6_0, bm6_0_0,bm6_0_1,  bm6_1)%>%as_tibble(rownames = "model")
+```
+
+Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ story + age + ling + mode + test_lang_status + (1 | child) + (story + age | testlanguage) 
+   Data: mstor_data (Number of observations: 5290) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 2722) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.58      0.02     0.54     0.62 1.00     3020     4777
+
+~testlanguage (Number of levels: 44) 
+                                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                          0.55      0.09     0.38     0.75 1.00     2148     3660
+sd(storyDog)                           0.31      0.10     0.13     0.52 1.00     1715     2477
+sd(storyBabybirds)                     0.56      0.12     0.35     0.82 1.01     1245     2118
+sd(storyBabygoats)                     0.60      0.14     0.35     0.91 1.01      937     1919
+sd(age)                                0.59      0.10     0.41     0.82 1.00     2678     4596
+cor(Intercept,storyDog)                0.09      0.25    -0.40     0.59 1.00     2422     3588
+cor(Intercept,storyBabybirds)         -0.28      0.22    -0.67     0.19 1.01     1310     2431
+cor(storyDog,storyBabybirds)          -0.19      0.28    -0.69     0.37 1.00      952     2177
+cor(Intercept,storyBabygoats)         -0.17      0.26    -0.63     0.35 1.01      973     1684
+cor(storyDog,storyBabygoats)          -0.42      0.28    -0.85     0.19 1.00      690     1021
+cor(storyBabybirds,storyBabygoats)     0.78      0.12     0.48     0.94 1.00     1613     3093
+cor(Intercept,age)                     0.47      0.23    -0.02     0.84 1.01     1019     2110
+cor(storyDog,age)                     -0.08      0.29    -0.62     0.47 1.00     1000     2583
+cor(storyBabybirds,age)               -0.36      0.24    -0.74     0.18 1.00     1369     2626
+cor(storyBabygoats,age)               -0.38      0.23    -0.74     0.14 1.00     1515     2635
+
+Regression Coefficients:
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept              0.08      0.11    -0.15     0.30 1.01     1335     2954
+storyDog              -0.05      0.08    -0.21     0.10 1.00     2979     4544
+storyBabybirds         0.39      0.12     0.15     0.63 1.00     2056     3414
+storyBabygoats         0.57      0.12     0.32     0.81 1.00     2273     3613
+age                    0.66      0.11     0.45     0.88 1.00     2761     4548
+lingMonolingual       -0.07      0.07    -0.20     0.07 1.00     4176     5588
+modetelling           -1.44      0.04    -1.52    -1.35 1.00     8706     5946
+test_lang_statusL2     0.03      0.08    -0.13     0.18 1.00     4321     5552
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+```{r}
+# ndata6 <- mstor_data%>%
+#   select(testlanguage,ling, age, mode, test_lang_status, story)%>%
+#   group_by(testlanguage,test_lang_status,ling, mode, story)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post6 <- fitted(bm6_0_1, newdata = ndata6, re_formula =~(age | testlanguage))%>%
+#   as_tibble() %>%
+#   bind_cols(ndata6)%>%
+#   mutate(age = age * sd(stor_data$age, na.rm = T) + mean(stor_data$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post6, "../saves/post6.rds")
+
+post6 <- readRDS("../saves/post6.rds")
+
+# ndata6_2 <- mstor_data%>%
+#   select(ling, age, mode, test_lang_status, story)%>%
+#   group_by(ling, mode, test_lang_status, story)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)
+# 
+# 
+# post6_2 <- fitted(bm6_0_1, newdata = ndata6_2, re_formula = NA)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata6_2)%>%
+#   mutate(age = age * sd(stor_data$age, na.rm = T) + mean(stor_data$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post6_2, "../saves/post6_2.rds")
+
+post6_2 <- readRDS("../saves/post6_2.rds")
+
+ggplot()+
+  geom_line(data = post6, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, group = interaction(ling,testlanguage, test_lang_status, story), lty = test_lang_status, col = story), stat = "identity", alpha = .25)+
+  geom_smooth(data = post6_2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, lty = test_lang_status, col = story, fill = story), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story")+
+  scale_fill_colorblind(name = "Story")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(ling~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+```{r}
+ggsave("../visuals/rq4_overview.pdf", width = 10, height = 7)
+#ggsave("../visuals/rq4_overview.png", width = 10, height = 7)
+```
+
+```{r}
+# ndata6_1 <- mstor_data%>%
+#   select(testlanguage, age, test_lang_status, story)%>%
+#   group_by(testlanguage, test_lang_status, story)%>%
+#   mutate(n = 1, 
+#          age = 0, 
+#          mode = "telling", 
+#          ling = "Bilingual", 
+#          test_lang_status = "L1")
+# 
+# post6_1 <- fitted(bm6_0_0, newdata = ndata6_1, re_formula =~(story + age | testlanguage), allow_new_levels = T)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata6_1)
+# 
+# saveRDS(post6_1, "../saves/post6_1.rds")
+
+post6_1 <- readRDS("../saves/post6_1.rds")
+
+p61 <- ggplot(post6_1, aes(x = Estimate, y = testlanguage, col = story))+
+  geom_pointrange(aes(xmin = Q2.5, xmax = Q97.5), position = position_dodge(width = 0.5))+
+  scale_color_colorblind(name = "Story")+
+    theme_bw()+
+  labs(x = "", y="")+
+  xlim(0,1)+
+  theme(
+    legend.position = c(0.8, 0.8), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"), 
+    axis.ticks.y = element_blank(), axis.text.y = element_blank(), axis.title.y = element_blank())
+
+```
+
+
+## 5 IST development by narrative lengths
+
+```{r}
+listdata <- data%>%
+  filter(item == "ist",
+         type == "td")%>%
+  group_by(child, age, mode, testlanguage, ling, story, test_lang_status, storylength)%>%
+  summarise(sum = sum(response),
+            n = length(response))
+```
+
+```{r}
+mlistdata <- listdata%>%
+  filter(!is.na(storylength),
+         storylength != "NA")%>%
+  mutate(storylength = as.numeric(storylength))%>%
+  ungroup()%>%
+  mutate(age = scale(age), 
+         storylength = scale(storylength))
+
+```
+
+```{r}
+# bm2_0 <- brm(sum|trials(n) ~ age + ling + mode + storylength * age + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = mlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_0, "../saves/bm2_0.rds")
+# 
+# bm2_0_0 <- brm(sum|trials(n) ~ age + ling + mode + storylength * age + test_lang_status+ (1|child) + (age + storylength | testlanguage), 
+#     data = mlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_0_0, "../saves/bm2_0_0.rds")
+# 
+# bm2_0_1 <- brm(sum|trials(n) ~ age + ling + mode + storylength + test_lang_status+ (1|child) + (age + storylength | testlanguage), 
+#     data = mlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_0_1, "../saves/bm2_0_1.rds")
+# 
+# bm2_1 <- brm(sum|trials(n) ~ age + ling + mode + storylength +test_lang_status+ (1|child) + (age | testlanguage), 
+#     data = mlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_1, "../saves/bm2_1.rds")
+```
+
+ 
+```{r}
+#loo_compare(bm2_0, bm2_0_0, bm2_1, bm2_0_1)%>%as_tibble(rownames = "model")
+```
+Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ age + ling + mode + storylength * age + test_lang_status + (1 | child) + (age + storylength | testlanguage) 
+   Data: mlistdata (Number of observations: 4183) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 2189) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.44      0.03     0.39     0.49 1.00     2518     4228
+
+~testlanguage (Number of levels: 35) 
+                           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                  0.61      0.11     0.43     0.85 1.00     1715     2773
+sd(age)                        0.48      0.12     0.26     0.75 1.00     1547     2985
+sd(storylength)                0.21      0.06     0.11     0.34 1.00     2143     3541
+cor(Intercept,age)             0.05      0.22    -0.37     0.46 1.00     2148     3557
+cor(Intercept,storylength)    -0.05      0.27    -0.58     0.46 1.00     2381     3510
+cor(age,storylength)          -0.23      0.30    -0.77     0.40 1.00     1717     2943
+
+Regression Coefficients:
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept             -0.00      0.13    -0.25     0.25 1.00     1604     2836
+age                    0.42      0.11     0.20     0.64 1.00     2096     3301
+lingMonolingual       -0.03      0.07    -0.17     0.11 1.00     5376     6023
+modetelling           -0.97      0.04    -1.04    -0.89 1.00     9945     6112
+storylength            0.49      0.05     0.39     0.59 1.00     3310     4325
+test_lang_statusL2    -0.14      0.09    -0.32     0.04 1.00     5059     5293
+age:storylength       -0.16      0.03    -0.22    -0.11 1.00     4826     6088
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+```{r}
+# ndata2 <- mlistdata%>%
+#   select(testlanguage,ling, age, mode, test_lang_status)%>%
+#   group_by(testlanguage,ling, mode, test_lang_status)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)%>%
+#   expand_grid(storylength = c(-1,0,1))
+# 
+# 
+# post2 <- fitted(bm2_0_0, newdata = ndata2, re_formula =~(age+ storylength| testlanguage), allow_new_levels = T)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata2)%>%
+#   mutate(age = age * sd(listdata$age, na.rm = T) + mean(listdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post2, "../saves/post2.rds")
+
+post2 <- readRDS("../saves/post2.rds")
+
+# ndata2_2 <- mistdata%>%
+#   select(ling, age, mode, test_lang_status)%>%
+#   group_by(ling, mode, test_lang_status)%>%
+#   distinct(age)%>%
+#   mutate(n = 1)%>%
+#   expand_grid(storylength = c(-1,0,1))
+# 
+# 
+# post2_2 <- fitted(bm2_0_0, newdata = ndata2_2, re_formula = NA, allow_new_levels = T)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata2_2)%>%
+#   mutate(age = age * sd(listdata$age, na.rm = T) + mean(listdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post2_2, "../saves/post2_2.rds")
+
+post2_2 <- readRDS("../saves/post2_2.rds")
+
+ggplot()+
+  geom_line(data = post2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = factor(storylength), group = interaction(storylength,testlanguage, test_lang_status), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  geom_smooth(data = post2_2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =factor(storylength), col = factor(storylength), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_fill_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(ling~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+```{r}
+ggsave("../visuals/rq2_overview.pdf", width = 12, height = 8)
+#ggsave("../visuals/rq2_overview.png", width = 12, height = 8)
+```
+
+```{r}
+# ndata2_1 <- mlistdata%>%
+#   select(testlanguage, age, test_lang_status)%>%
+#   group_by(testlanguage, test_lang_status)%>%
+#   mutate(n = 1, 
+#          age = 0, 
+#          mode = "telling", 
+#          ling = "Bilingual",
+#          test_lang_status = "L1")%>%
+#   expand_grid(storylength = c(-1,0,1))
+# 
+# post2_1 <- fitted(bm2_0_0, newdata = ndata2_1, re_formula =~(age + storylength| testlanguage), allow_new_levels = T)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata2_1)
+# 
+# saveRDS(post2_1, "../saves/post2_1.rds")
+
+post2_1 <- readRDS("../saves/post2_1.rds")
+
+p21 <- ggplot(post2_1, aes(x = Estimate, y = testlanguage, col = factor(storylength)))+
+  geom_pointrange(aes(xmin = Q2.5, xmax = Q97.5), position = position_dodge(width = 0.5))+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+    theme_bw()+
+  labs(x = "", y="Test language")+
+  xlim(0,1)+
+  theme(
+    legend.position = c(0.8, 0.8), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+```
+
+### 5.1. Story length normalized by language
+
+```{r}
+nmlistdata <- listdata%>%
+  filter(!is.na(storylength),
+         storylength != "NA")%>%
+  mutate(storylength = as.numeric(storylength))%>%
+  ungroup()%>%
+  mutate(age = scale(age))%>%
+  group_by(testlanguage)%>%
+  mutate(storylength = scale(storylength))%>%
+  ungroup()
+
+```
+
+```{r}
+# bm2_0_n <- brm(sum|trials(n) ~ age + ling + mode + storylength * age + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = nmlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_0_n, "../saves/bm2_0_n.rds")
+# 
+# bm2_1_n <- brm(sum|trials(n) ~ age + ling + mode + storylength + test_lang_status + (1|child) + (age | testlanguage), 
+#     data = nmlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_1_n, "../saves/bm2_1_n.rds")
+# 
+# bm2_0_0_n <- brm(sum|trials(n) ~ age + ling + mode + storylength * age + test_lang_status+ (1|child) + (age + storylength | testlanguage), 
+#     data = nmlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_0_0_n, "../saves/bm2_0_0_n.rds")
+# 
+# bm2_0_1_n <- brm(sum|trials(n) ~ age + ling + mode + storylength + test_lang_status+ (1|child) + (age + storylength | testlanguage), 
+#     data = nmlistdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = binomial(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm2_0_1_n, "../saves/bm2_0_1_n.rds")
+
+
+```
+
+```{r}
+#loo_compare(bm2_0_n, bm2_0_0_n, bm2_0_1_n, bm2_1_n)%>%as_tibble(rownames = "model")
+```
+
+Family: binomial 
+  Links: mu = logit 
+Formula: sum | trials(n) ~ age + ling + mode + storylength * age + test_lang_status + (1 | child) + (age + storylength | testlanguage) 
+   Data: nmlistdata (Number of observations: 4183) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 2189) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.44      0.03     0.39     0.49 1.00     2644     3955
+
+~testlanguage (Number of levels: 35) 
+                           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                  0.54      0.10     0.38     0.75 1.00     1779     3735
+sd(age)                        0.58      0.13     0.35     0.86 1.00     1541     2809
+sd(storylength)                0.18      0.04     0.11     0.27 1.00     1930     3182
+cor(Intercept,age)            -0.01      0.21    -0.42     0.39 1.00     1369     2606
+cor(Intercept,storylength)    -0.27      0.23    -0.67     0.21 1.00     2880     4330
+cor(age,storylength)          -0.22      0.28    -0.70     0.36 1.00     1811     3088
+
+Regression Coefficients:
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept             -0.04      0.12    -0.27     0.19 1.00     1563     2940
+age                    0.47      0.12     0.23     0.72 1.00     1837     2886
+lingMonolingual       -0.05      0.07    -0.19     0.10 1.00     4483     5588
+modetelling           -0.98      0.04    -1.05    -0.91 1.00     7631     5887
+storylength            0.36      0.04     0.28     0.43 1.00     2890     4263
+test_lang_statusL2    -0.15      0.09    -0.33     0.03 1.00     4312     5426
+age:storylength       -0.14      0.02    -0.19    -0.09 1.00     4235     5267
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+
+### 5.2. Story length for tokens
+
+```{r}
+tokdata <- data%>%
+  filter(item == "setting",
+         type == "td", 
+         !is.na(C.total))
+
+```
+
+```{r}
+mtokdata <- tokdata%>%
+  filter(!is.na(storylength),
+         storylength != "NA")%>%
+  mutate(storylength = as.numeric(storylength))%>%
+  ungroup()%>%
+  mutate(age = scale(age), 
+         storylength = scale(storylength))
+```
+
+```{r}
+# bm52_1 <- brm(C.total ~ age + ling + mode + storylength * age + test_lang_status+ (1|child) + (age + storylength | testlanguage), 
+#     data = mtokdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = poisson(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm52_1, "../saves/bm52_1.rds")
+# 
+# bm52_2 <- brm(C.total ~ age * ling + mode + storylength * age + test_lang_status+ (1|child) + (age + storylength | testlanguage), 
+#     data = mtokdata,
+#     chains = 4, 
+#     cores = 4,
+#     iter = 4000,
+#     family = poisson(),
+#     threads = threading(8), 
+#     backend = "cmdstanr",
+#     control = list(adapt_delta = 0.95, max_treedepth = 20)
+#     )%>%add_criterion("loo")
+# 
+# saveRDS(bm52_2, "../saves/bm52_2.rds")
+```
+
+```{r}
+#loo_compare(bm52_1, bm52_2)%>%as_tibble(rownames = "model")
+```
+
+
+Family: poisson 
+  Links: mu = log 
+Formula: C.total ~ age + ling + mode + storylength * age + test_lang_status + (1 | child) + (age + storylength | testlanguage) 
+   Data: mtokdata (Number of observations: 2741) 
+  Draws: 4 chains, each with iter = 4000; warmup = 2000; thin = 1;
+         total post-warmup draws = 8000
+
+Multilevel Hyperparameters:
+~child (Number of levels: 1423) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.08      0.03     0.01     0.13 1.00     1254     1696
+
+~testlanguage (Number of levels: 32) 
+                           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)                  0.50      0.08     0.36     0.68 1.00     3674     5117
+sd(age)                        0.39      0.11     0.20     0.63 1.00     2365     3342
+sd(storylength)                0.12      0.03     0.07     0.18 1.00     3993     5995
+cor(Intercept,age)            -0.14      0.23    -0.57     0.32 1.00     2547     4067
+cor(Intercept,storylength)     0.07      0.25    -0.41     0.56 1.00     4860     6068
+cor(age,storylength)          -0.34      0.25    -0.76     0.19 1.00     3969     5797
+
+Regression Coefficients:
+                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept              1.11      0.10     0.90     1.31 1.00     2415     4145
+age                    0.26      0.09     0.10     0.44 1.00     3606     4793
+lingMonolingual        0.40      0.06     0.28     0.51 1.00     9831     7392
+modetelling           -0.17      0.02    -0.22    -0.12 1.00    19430     6862
+storylength            0.34      0.03     0.29     0.40 1.00     6155     6160
+test_lang_statusL2     0.06      0.08    -0.08     0.21 1.00     9137     7028
+age:storylength       -0.12      0.02    -0.16    -0.08 1.00    10108     6813
+
+```{r}
+# ndata52 <- mtokdata%>%
+#   select(testlanguage,ling, age, mode, test_lang_status)%>%
+#   distinct(age, .keep_all = T)%>%
+#   expand_grid(storylength = c(-1,0,1))
+# 
+# 
+# post52 <- fitted(bm52_1, newdata = ndata52, re_formula =~(age+ storylength| testlanguage), allow_new_levels = T)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata52)%>%
+#   mutate(age = age * sd(tokdata$age, na.rm = T) + mean(tokdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post52, "../saves/post52.rds")
+
+post52 <- readRDS("../saves/post52.rds")
+
+# ndata52_2 <- mtokdata%>%
+#   select(ling, age, mode, test_lang_status)%>%
+#   distinct(age, .keep_all = T)%>%
+#   expand_grid(storylength = c(-1,0,1))
+# 
+# 
+# post52_2 <- fitted(bm52_1, newdata = ndata52_2, re_formula = NA, allow_new_levels = T)%>%
+#   as_tibble() %>%
+#   bind_cols(ndata52_2)%>%
+#   mutate(age = age * sd(tokdata$age, na.rm = T) + mean(tokdata$age, na.rm = T))%>%
+#   mutate(mode = str_to_title(mode))%>%
+#   mutate(mode = factor(mode, levels = c("Telling","Retelling")))
+# 
+# saveRDS(post52_2, "../saves/post52_2.rds")
+
+post52_2 <- readRDS("../saves/post52_2.rds")
+
+ggplot()+
+  geom_line(data = post52, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = factor(storylength), group = interaction(storylength,testlanguage, test_lang_status), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  geom_smooth(data = post52_2, aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =factor(storylength), col = factor(storylength), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_fill_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_linetype(name = "Test language")+
+  facet_grid(ling~mode)+
+  ylim(0,15)+
+  labs(x = "Age in years", y="No. of internal state terms")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+```{r}
+ggsave("../visuals/rq52_overview.pdf", width = 12, height = 8)
+#ggsave("../visuals/rq52_overview.png", width = 12, height = 8)
+```
+
+## Variation across languages
+
+```{r}
+plot_grid(p21,p61, nrow = 1)
+```
+
+```{r}
+ggsave("../visuals/lang_var_overview.pdf", width = 10, height = 12)
+#ggsave("../visuals/lang_var_overview.png", width = 10, height = 12)
+```
