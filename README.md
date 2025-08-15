@@ -1,4 +1,4 @@
-# Internal state terms in children’s fictional stories: A large-scale study using the Multilingual Assessment Instrument for Narratives
+# Children’s oral narrative skills through the lens of internal state terms: A large-scale study of fictional stories elicited with the Multilingual Assessment Instrument for Narratives
 
 ------------------------------------------------------------------------
 
