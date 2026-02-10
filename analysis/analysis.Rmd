@@ -314,14 +314,54 @@ p2_1 <- ggplot()+
   ylim(0,1)+
   xlim(2.5, 14)+
   facet_grid(~mode)+
-  labs(x = "Age in years", y="Probability of producing internal state")+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
   theme(
     #legend.position = c(0.8, 0.15), 
     legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
 ```
 
 ```{r}
-ggsave("../visuals/rq1_overview.pdf", width = 12, height = 6)
+p2_1_t <- ggplot()+
+  geom_line(data = post1%>%filter(mode == "Telling"),
+            aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, group = interaction(ling,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post1_2%>%filter(mode == "Telling"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, fill = ling, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_ptol(name = "Group")+
+  scale_fill_ptol(name = "Group")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  xlim(2.5, 14)+
+  #facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+p2_1_r <- ggplot()+
+  geom_line(data = post1%>%filter(mode == "Retelling"),
+            aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, group = interaction(ling,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post1_2%>%filter(mode == "Telling"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, fill = ling, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_ptol(name = "Group")+
+  scale_fill_ptol(name = "Group")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  xlim(2.5, 14)+
+  #facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of producing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+
+```{r}
+ggarrange(p2_1_t, p2_1_r, common.legend = T, legend = "right", labels = c("A", "B"))
+```
+
+
+```{r}
+ggsave("../visuals/rq1_overview.pdf", width = 12, height = 5)
 ```
 
 
@@ -475,10 +515,15 @@ p2_2 <- ggplot()+
   ylim(0,1)+
   xlim(2.5, 14)+
   facet_grid(~mode)+
-  labs(x = "Age in years", y="Probability of producing internal state")+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
   theme(
     #legend.position = c(0.8, 0.15), 
     legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+
+```{r}
+
 ```
 
 
@@ -495,7 +540,61 @@ plot_grid(
 ```
 
 ```{r}
+p2_2_t <- ggplot()+
+  geom_line(data = post1_0%>%filter(mode == "Telling"),
+            aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, group = interaction(ling,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post1_2_0%>%filter(mode == "Telling"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, fill = ling, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_ptol(name = "Group")+
+  scale_fill_ptol(name = "Group")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  xlim(2.5, 14)+
+  #facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of producing\n internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+p2_2_r <- ggplot()+
+  geom_line(data = post1_0%>%filter(mode == "Retelling"),
+            aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, group = interaction(ling,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post1_2_0%>%filter(mode == "Telling"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = ling, fill = ling, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_ptol(name = "Group")+
+  scale_fill_ptol(name = "Group")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  xlim(2.5, 14)+
+  #facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of producing\n internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+
+```{r}
+legend <- get_legend(
+  # create some space to the left of the legend
+  p2_2 + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+plot_grid(
+  plot_grid(
+    plot_grid(
+      p2_1_t + theme(legend.position="none"), 
+      p2_1_r+ theme(legend.position="none"), labels = c("A", "B")),
+    plot_grid(p2_2_t + theme(legend.position="none"), 
+              p2_2_r+ theme(legend.position="none"), labels = c("C", "D"))
+    , nrow = 2, rel_heights = c(1, 1.1)), legend, nrow = 1, rel_widths = c(1, .2))
+```
+
+```{r}
 ggsave("../visuals/rq2_overview.png", width = 12, height = 8)
+ggsave("../visuals/fig5.png", width = 10, height = 6)
+ggsave("../visuals/fig5.pdf", width = 10, height = 6)
+ggsave("../visuals/rq2_overview.pdf", width = 12, height = 8)
 ```
 
 ## 3 ISTs as initiating event or reaction
@@ -671,9 +770,54 @@ ggplot()+
     #legend.position = c(0.8, 0.15), 
     legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
 ```
+```{r}
+p3_1 <- ggplot()+
+  geom_line(data = post3%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = item, group = interaction(item,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post3_2%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =item, col = item, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Internal state", labels = c("Initiating event", "Reaction"))+
+  scale_fill_colorblind(name = "Internal state", labels = c("Initiating event", "Reaction"))+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+p3_2 <- ggplot()+
+  geom_line(data = post3%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = item, group = interaction(item,testlanguage, test_lang_status), lty = test_lang_status), stat = "identity", alpha = .25)+
+  geom_smooth(data = post3_2%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =item, col = item, lty = test_lang_status), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Internal state", labels = c("Initiating event", "Reaction"))+
+  scale_fill_colorblind(name = "Internal state", labels = c("Initiating event", "Reaction"))+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+
+```{r}
+legend <- get_legend(
+  # create some space to the left of the legend
+  p3_2 + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+plot_grid(
+  plot_grid(p3_1+ theme(legend.position="none"),
+          p3_2+ theme(legend.position="none"),
+          nrow = 2, labels = c("A", "B")),legend, nrow = 1, rel_widths = c(1, .2))
+```
+
 
 ```{r}
 ggsave("../visuals/rq3_overview.pdf", width = 10, height = 7)
+ggsave("../visuals/fig6.png", width = 10, height = 6)
+ggsave("../visuals/fig6.pdf", width = 10, height = 6)
 #ggsave("../visuals/rq3_overview.png", width = 10, height = 7)
 ```
 
@@ -855,8 +999,50 @@ ggplot()+
 ```
 
 ```{r}
+p6_1 <- ggplot()+
+  geom_line(data = post6%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, group = interaction(ling,testlanguage, test_lang_status, story), lty = test_lang_status, col = story), stat = "identity", alpha = .25)+
+  geom_smooth(data = post6_2%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, lty = test_lang_status, col = story, fill = story), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story")+
+  scale_fill_colorblind(name = "Story")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+p6_2 <- ggplot()+
+  geom_line(data = post6%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, group = interaction(ling,testlanguage, test_lang_status, story), lty = test_lang_status, col = story), stat = "identity", alpha = .25)+
+  geom_smooth(data = post6_2%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, lty = test_lang_status, col = story, fill = story), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story")+
+  scale_fill_colorblind(name = "Story")+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+```{r}
+legend <- get_legend(
+  # create some space to the left of the legend
+  p6_2 + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+plot_grid(
+  plot_grid(p6_1+ theme(legend.position="none"),
+          p6_2+ theme(legend.position="none"),
+          nrow = 2, labels = c("A", "B")),legend, nrow = 1, rel_widths = c(1, .2))
+```
+
+```{r}
 ggsave("../visuals/rq4_overview.pdf", width = 10, height = 7)
-#ggsave("../visuals/rq4_overview.png", width = 10, height = 7)
+ggsave("../visuals/fig7.png", width = 10, height = 6)
+ggsave("../visuals/fig7.pdf", width = 10, height = 6)
 ```
 
 ```{r}
@@ -1057,8 +1243,58 @@ ggplot()+
   theme(
     #legend.position = c(0.8, 0.15), 
     legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
 ```
+
+
 ```{r}
+p8_1 <- ggplot()+
+  geom_line(data = post2%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = factor(storylength), group = interaction(storylength,testlanguage, test_lang_status), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  geom_smooth(data = post2_2%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =factor(storylength), col = factor(storylength), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_fill_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+
+p8_2 <- ggplot()+
+  geom_line(data = post2%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = factor(storylength), group = interaction(storylength,testlanguage, test_lang_status), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  geom_smooth(data = post2_2%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =factor(storylength), col = factor(storylength), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_fill_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_linetype(name = "Test language")+
+  ylim(0,1)+
+  facet_grid(~mode)+
+  labs(x = "Age in years", y="Probability of \nproducing internal state")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+
+
+```{r}
+legend <- get_legend(
+  # create some space to the left of the legend
+  p8_2 + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+plot_grid(
+  plot_grid(p8_1+ theme(legend.position="none"),
+          p8_2+ theme(legend.position="none"),
+          nrow = 2, labels = c("A", "B")),legend, nrow = 1, rel_widths = c(1, .2))
+```
+
+```{r}
+ggsave("../visuals/fig8.pdf", width = 10, height = 6)
+ggsave("../visuals/fig8.png", width = 10, height = 6)
 ggsave("../visuals/rq2_overview.pdf", width = 12, height = 8)
 #ggsave("../visuals/rq2_overview.png", width = 12, height = 8)
 ```
@@ -1340,6 +1576,50 @@ ggplot()+
 ```
 
 ```{r}
+p5_1 <- ggplot()+
+  geom_line(data = post52%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = factor(storylength), group = interaction(storylength,testlanguage, test_lang_status), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  geom_smooth(data = post52_2%>%filter(ling == "Monolingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =factor(storylength), col = factor(storylength), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_fill_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_linetype(name = "Test language")+
+  facet_grid(~mode)+
+  ylim(0,15)+
+  labs(x = "Age in years", y="Number of \ninternal state terms")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+
+p5_2 <- ggplot()+
+  geom_line(data = post52%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, col = factor(storylength), group = interaction(storylength,testlanguage, test_lang_status), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  geom_smooth(data = post52_2%>%filter(ling == "Bilingual"), aes(x = age/12, y = Estimate, ymin = Q2.5, ymax = Q97.5, fill =factor(storylength), col = factor(storylength), lty = factor(test_lang_status)), stat = "identity", alpha = .25)+
+  theme_bw()+
+  scale_color_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_fill_colorblind(name = "Story length", labels = c("short (-1SD)", "average", "long (+1SD)"))+
+  scale_linetype(name = "Test language")+
+  facet_grid(~mode)+
+  ylim(0,15)+
+  labs(x = "Age in years", y="Number of \ninternal state terms")+
+  theme(
+    #legend.position = c(0.8, 0.15), 
+    legend.background = element_rect(colour = "black", size = 0.5, linetype = "solid"))
+```
+
+```{r}
+legend <- get_legend(
+  # create some space to the left of the legend
+  p5_2 + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+plot_grid(
+  plot_grid(p5_1+ theme(legend.position="none"),
+          p5_2+ theme(legend.position="none"),
+          nrow = 2, labels = c("A", "B")),legend, nrow = 1, rel_widths = c(1, .2))
+```
+
+```{r}
+ggsave("../visuals/fig9.pdf", width = 10, height = 6)
+ggsave("../visuals/fig9.png", width = 10, height = 6)
 ggsave("../visuals/rq52_overview.pdf", width = 12, height = 8)
 #ggsave("../visuals/rq52_overview.png", width = 12, height = 8)
 ```
