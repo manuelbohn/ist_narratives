@@ -592,8 +592,8 @@ plot_grid(
 
 ```{r}
 ggsave("../visuals/rq2_overview.png", width = 12, height = 8)
-ggsave("../visuals/fig5.png", width = 10, height = 6)
-ggsave("../visuals/fig5.pdf", width = 10, height = 6)
+ggsave("../visuals/fig5.png", width = 10, height = 6, dpi = 900, scale = 1.2)
+ggsave("../visuals/fig5.pdf", width = 10, height = 6, dpi = 900, scale = 1.2)
 ggsave("../visuals/rq2_overview.pdf", width = 12, height = 8)
 ```
 
@@ -816,8 +816,8 @@ plot_grid(
 
 ```{r}
 ggsave("../visuals/rq3_overview.pdf", width = 10, height = 7)
-ggsave("../visuals/fig6.png", width = 10, height = 6)
-ggsave("../visuals/fig6.pdf", width = 10, height = 6)
+ggsave("../visuals/fig6.png", width = 10, height = 6, dpi = 900)
+ggsave("../visuals/fig6.pdf", width = 10, height = 6, dpi = 900)
 #ggsave("../visuals/rq3_overview.png", width = 10, height = 7)
 ```
 
@@ -1041,8 +1041,8 @@ plot_grid(
 
 ```{r}
 ggsave("../visuals/rq4_overview.pdf", width = 10, height = 7)
-ggsave("../visuals/fig7.png", width = 10, height = 6)
-ggsave("../visuals/fig7.pdf", width = 10, height = 6)
+ggsave("../visuals/fig7.png", width = 10, height = 6, dpi = 900)
+ggsave("../visuals/fig7.pdf", width = 10, height = 6, dpi = 900)
 ```
 
 ```{r}
@@ -1293,8 +1293,8 @@ plot_grid(
 ```
 
 ```{r}
-ggsave("../visuals/fig8.pdf", width = 10, height = 6)
-ggsave("../visuals/fig8.png", width = 10, height = 6)
+ggsave("../visuals/fig8.pdf", width = 10, height = 6, dpi = 900)
+ggsave("../visuals/fig8.png", width = 10, height = 6, dpi = 900)
 ggsave("../visuals/rq2_overview.pdf", width = 12, height = 8)
 #ggsave("../visuals/rq2_overview.png", width = 12, height = 8)
 ```
